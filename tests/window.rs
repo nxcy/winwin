@@ -1,4 +1,7 @@
-use windows::Win32::{Foundation::*, UI::WindowsAndMessaging::*};
+use windows::{
+    core::*,
+    Win32::{Foundation::*, UI::WindowsAndMessaging::*},
+};
 
 #[test]
 fn test() {
@@ -7,7 +10,7 @@ fn test() {
 
 struct App;
 impl winwin::App for App {
-    fn new(_hwnd: HWND) -> windows::core::Result<Self> {
+    fn new(_hwnd: HWND) -> Result<Self> {
         Ok(App)
     }
 

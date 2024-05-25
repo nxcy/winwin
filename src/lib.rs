@@ -3,8 +3,10 @@ use windows::{
     Win32::UI::WindowsAndMessaging::*,
 };
 
-pub trait App: Sized {
-    fn new(hwnd: HWND) -> Result<Self>;
+pub trait App {
+    fn new(hwnd: HWND) -> Result<Self>
+    where
+        Self: Sized;
     fn wndproc(&mut self, hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT;
 }
 
