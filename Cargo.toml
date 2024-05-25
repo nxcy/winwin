@@ -2,6 +2,9 @@
 name = "winwin"
 version = "0.0.1"
 edition = "2021"
+license = "MIT"
+description = "windows windowing"
+repository = "https://github.com/nxcy/winwin"
 
 [dependencies.windows]
 version = "0.56"
