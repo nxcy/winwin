@@ -1,16 +1,6 @@
 use windows::{
-    core::{w, Result, HSTRING},
-    Win32::{
-        Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM},
-        System::LibraryLoader::GetModuleHandleW,
-        UI::WindowsAndMessaging::{
-            AdjustWindowRect, CreateWindowExW, DefWindowProcW, DispatchMessageW, GetWindowLongPtrW,
-            LoadCursorW, PeekMessageW, RegisterClassExW, SetWindowLongPtrW, ShowWindow,
-            TranslateMessage, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, GWLP_USERDATA, IDC_ARROW, MSG,
-            PM_REMOVE, SW_SHOW, WINDOW_EX_STYLE, WM_QUIT, WNDCLASSEXW, WS_CAPTION, WS_MINIMIZEBOX,
-            WS_OVERLAPPED, WS_SYSMENU,
-        },
-    },
+    core::*, Win32::Foundation::*, Win32::System::LibraryLoader::*,
+    Win32::UI::WindowsAndMessaging::*,
 };
 
 pub trait App: Sized {

@@ -1,7 +1,4 @@
-use windows::Win32::{
-    Foundation::{HWND, LPARAM, LRESULT, WPARAM},
-    UI::WindowsAndMessaging::{DefWindowProcW, PostQuitMessage, WM_DESTROY},
-};
+use windows::Win32::{Foundation::*, UI::WindowsAndMessaging::*};
 
 #[test]
 fn test() {
