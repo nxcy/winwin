@@ -1,14 +1,14 @@
 use windows::{
-    core::*, Win32::Foundation::*, Win32::System::LibraryLoader::*,
-    Win32::UI::WindowsAndMessaging::*,
+    core::*,
+    Win32::{Foundation::*, System::LibraryLoader::*, UI::WindowsAndMessaging::*},
 };
 
 pub trait Window {
     fn new(hwnd: HWND) -> Result<Self>
     where
         Self: Sized;
-    fn on_render(&mut self);
-    fn on_resize(&mut self, size: (u32, u32));
+    fn on_paint(&mut self);
+    fn on_size(&mut self, size: (u32, u32));
 }
 
 pub fn run<T: Window>(width: u32, height: u32, title: &str) -> Result<()> {
@@ -85,11 +85,11 @@ extern "system" fn wndproc<T: Window>(
         {
             match msg {
                 WM_PAINT => {
-                    ptr.as_mut().on_render();
+                    ptr.as_mut().on_paint();
                     return LRESULT(0);
                 }
                 WM_SIZE => {
-                    ptr.as_mut().on_resize((
+                    ptr.as_mut().on_size((
                         (lparam.0 & 0xFFFF) as u32,
                         ((lparam.0 >> 16) & 0xFFFF) as u32,
                     ));
