@@ -23,24 +23,24 @@ pub fn run<T: Window>(width: u32, height: u32, title: &str) -> Result<()> {
             ..Default::default()
         });
 
-        let mut rect = RECT {
+        let mut window_rect = RECT {
             left: 0,
             top: 0,
             right: width as i32,
             bottom: height as i32,
         };
-        AdjustWindowRect(&mut rect, WS_OVERLAPPEDWINDOW, false)?;
+        AdjustWindowRect(&mut window_rect, WS_OVERLAPPEDWINDOW, false)?;
 
         let title = HSTRING::from(title);
         let hwnd = CreateWindowExW(
-            WINDOW_EX_STYLE::default(),
+            WINDOW_EX_STYLE(0),
             w!("ClassName"),
             &title,
             WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            rect.right - rect.left,
-            rect.bottom - rect.top,
+            window_rect.right - window_rect.left,
+            window_rect.bottom - window_rect.top,
             None,
             None,
             GetModuleHandleW(None)?,
