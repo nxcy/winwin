@@ -3,27 +3,23 @@ use windows::{
     Win32::UI::WindowsAndMessaging::*,
 };
 
-pub trait App {
+pub trait Window {
     fn new(hwnd: HWND) -> Result<Self>
     where
         Self: Sized;
-    fn wndproc(&mut self, hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT;
+    fn on_render(&mut self);
+    fn on_resize(&mut self, size: (u32, u32));
 }
 
-pub fn run<A: App>(width: u32, height: u32, title: &str) -> Result<()> {
+pub fn run<T: Window>(width: u32, height: u32, title: &str) -> Result<()> {
     unsafe {
-        let instance = GetModuleHandleW(None)?;
-
-        let class_name = w!("AppClassName");
-        let window_style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
-
         RegisterClassExW(&WNDCLASSEXW {
             cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
             style: CS_HREDRAW | CS_VREDRAW,
-            lpfnWndProc: Some(wndproc::<A>),
-            hInstance: instance.into(),
+            lpfnWndProc: Some(wndproc::<T>),
+            hInstance: GetModuleHandleW(None)?.into(),
             hCursor: LoadCursorW(None, IDC_ARROW).unwrap(),
-            lpszClassName: class_name,
+            lpszClassName: w!("ClassName"),
             ..Default::default()
         });
 
@@ -33,35 +29,38 @@ pub fn run<A: App>(width: u32, height: u32, title: &str) -> Result<()> {
             right: width as i32,
             bottom: height as i32,
         };
-        AdjustWindowRect(&mut rect, window_style, false)?;
+        AdjustWindowRect(&mut rect, WS_OVERLAPPEDWINDOW, false)?;
 
         let title = HSTRING::from(title);
         let hwnd = CreateWindowExW(
             WINDOW_EX_STYLE::default(),
-            class_name,
+            w!("ClassName"),
             &title,
-            window_style,
+            WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             rect.right - rect.left,
             rect.bottom - rect.top,
             None,
             None,
-            instance,
+            GetModuleHandleW(None)?,
             None,
         );
 
-        let mut app = A::new(hwnd)?;
+        let mut window = T::new(hwnd)?;
 
-        SetWindowLongPtrW(hwnd, GWLP_USERDATA, &mut app as *mut A as isize);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, &mut window as *mut T as isize);
 
         let _ = ShowWindow(hwnd, SW_SHOW);
 
         let mut msg = MSG::default();
-        while msg.message != WM_QUIT {
-            if PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).into() {
-                let _ = TranslateMessage(&msg);
-                DispatchMessageW(&msg);
+        loop {
+            match GetMessageW(&mut msg, None, 0, 0).0 {
+                -1 => return Err(Error::from_win32()),
+                0 => break,
+                _ => {
+                    DispatchMessageW(&msg);
+                }
             }
         }
     }
@@ -69,16 +68,37 @@ pub fn run<A: App>(width: u32, height: u32, title: &str) -> Result<()> {
     Ok(())
 }
 
-extern "system" fn wndproc<A: App>(
+extern "system" fn wndproc<T: Window>(
     hwnd: HWND,
     msg: u32,
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
     unsafe {
-        match std::ptr::NonNull::<A>::new(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut A) {
-            Some(mut ptr) => ptr.as_mut().wndproc(hwnd, msg, wparam, lparam),
-            None => DefWindowProcW(hwnd, msg, wparam, lparam),
+        if msg == WM_DESTROY {
+            PostQuitMessage(0);
+            return LRESULT(0);
         }
+
+        if let Some(mut ptr) =
+            std::ptr::NonNull::<T>::new(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut T)
+        {
+            match msg {
+                WM_PAINT => {
+                    ptr.as_mut().on_render();
+                    return LRESULT(0);
+                }
+                WM_SIZE => {
+                    ptr.as_mut().on_resize((
+                        (lparam.0 & 0xFFFF) as u32,
+                        ((lparam.0 >> 16) & 0xFFFF) as u32,
+                    ));
+                    return LRESULT(0);
+                }
+                _ => {}
+            }
+        }
+
+        return DefWindowProcW(hwnd, msg, wparam, lparam);
     }
 }
