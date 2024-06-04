@@ -9,7 +9,7 @@ use windows::{
 
 pub struct Window<EH: EventHandler> {
     hwnd: HWND,
-    phantom_data: PhantomData<EH>,
+    phantom_data: PhantomData<*const EH>,
 }
 
 pub trait EventHandler {
