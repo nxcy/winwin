@@ -1,7 +1,8 @@
 #![forbid(unsafe_op_in_unsafe_fn)]
 
-use std::{marker::PhantomData, mem::size_of};
+use std::{marker::PhantomData, mem::size_of, num::NonZeroIsize};
 
+use raw_window_handle::{RawWindowHandle, Win32WindowHandle};
 use windows::{
     core::*,
     Win32::{Foundation::*, System::LibraryLoader::*, UI::WindowsAndMessaging::*},
@@ -59,8 +60,10 @@ impl<EH: EventHandler> Window<EH> {
         }
     }
 
-    pub fn hwnd(&self) -> HWND {
-        self.hwnd
+    pub fn raw_window_handle(&self) -> RawWindowHandle {
+        RawWindowHandle::Win32(Win32WindowHandle::new(
+            NonZeroIsize::new(self.hwnd.0).unwrap(),
+        ))
     }
 
     pub fn run(self, mut event_handler: EH) {
