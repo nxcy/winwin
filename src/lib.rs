@@ -1,74 +1,90 @@
+#![forbid(unsafe_op_in_unsafe_fn)]
+
+use std::{marker::PhantomData, mem::size_of};
+
 use windows::{
     core::*,
     Win32::{Foundation::*, System::LibraryLoader::*, UI::WindowsAndMessaging::*},
 };
 
-pub trait Window {
-    fn new(hwnd: HWND) -> Result<Self>
-    where
-        Self: Sized;
-    fn on_paint(&mut self);
-    fn on_size(&mut self, size: (u32, u32));
+pub struct Window<EH: EventHandler> {
+    hwnd: HWND,
+    phantom_data: PhantomData<EH>,
 }
 
-pub fn run<T: Window>(width: u32, height: u32, title: &str) -> Result<()> {
-    unsafe {
-        RegisterClassExW(&WNDCLASSEXW {
-            cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
-            style: CS_HREDRAW | CS_VREDRAW,
-            lpfnWndProc: Some(wndproc::<T>),
-            hInstance: GetModuleHandleW(None)?.into(),
-            hCursor: LoadCursorW(None, IDC_ARROW).unwrap(),
-            lpszClassName: w!("ClassName"),
-            ..Default::default()
-        });
+pub trait EventHandler {
+    fn on_paint(&mut self);
+}
 
-        let mut window_rect = RECT {
-            left: 0,
-            top: 0,
-            right: width as i32,
-            bottom: height as i32,
-        };
-        AdjustWindowRect(&mut window_rect, WS_OVERLAPPEDWINDOW, false)?;
+impl<EH: EventHandler> Window<EH> {
+    pub fn new(size: (u32, u32), name: impl Param<PCWSTR>) -> Result<Self> {
+        unsafe {
+            RegisterClassExW(&WNDCLASSEXW {
+                cbSize: size_of::<WNDCLASSEXW>() as u32,
+                style: CS_HREDRAW | CS_VREDRAW,
+                lpfnWndProc: Some(wndproc::<EH>),
+                hInstance: GetModuleHandleW(None)?.into(),
+                hCursor: LoadCursorW(None, IDC_ARROW)?,
+                lpszClassName: w!("winwin-rs-class-name"),
+                ..Default::default()
+            });
 
-        let title = HSTRING::from(title);
-        let hwnd = CreateWindowExW(
-            WINDOW_EX_STYLE(0),
-            w!("ClassName"),
-            &title,
-            WS_OVERLAPPEDWINDOW,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            window_rect.right - window_rect.left,
-            window_rect.bottom - window_rect.top,
-            None,
-            None,
-            GetModuleHandleW(None)?,
-            None,
-        );
+            let mut rect = RECT {
+                left: 0,
+                top: 0,
+                right: size.0 as i32,
+                bottom: size.1 as i32,
+            };
+            AdjustWindowRect(&mut rect, WS_OVERLAPPEDWINDOW, false)?;
 
-        let mut window = T::new(hwnd)?;
+            let hwnd = CreateWindowExW(
+                WINDOW_EX_STYLE::default(),
+                w!("winwin-rs-class-name"),
+                name,
+                WS_OVERLAPPEDWINDOW,
+                CW_USEDEFAULT,
+                CW_USEDEFAULT,
+                rect.right - rect.left,
+                rect.bottom - rect.top,
+                None,
+                None,
+                GetModuleHandleW(None)?,
+                None,
+            );
 
-        SetWindowLongPtrW(hwnd, GWLP_USERDATA, &mut window as *mut T as isize);
+            Ok(Self {
+                hwnd,
+                phantom_data: PhantomData,
+            })
+        }
+    }
 
-        let _ = ShowWindow(hwnd, SW_SHOW);
+    pub fn hwnd(&self) -> HWND {
+        self.hwnd
+    }
 
-        let mut msg = MSG::default();
-        loop {
-            match GetMessageW(&mut msg, None, 0, 0).0 {
-                -1 => return Err(Error::from_win32()),
-                0 => break,
-                _ => {
+    pub fn run(self, mut event_handler: EH) {
+        unsafe {
+            SetWindowLongPtrW(
+                self.hwnd,
+                GWLP_USERDATA,
+                &mut event_handler as *mut EH as isize,
+            );
+
+            let _ = ShowWindow(self.hwnd, SW_SHOW);
+
+            let mut msg = MSG::default();
+            while msg.message != WM_QUIT {
+                if PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).into() {
+                    let _ = TranslateMessage(&msg);
                     DispatchMessageW(&msg);
                 }
             }
         }
     }
-
-    Ok(())
 }
 
-extern "system" fn wndproc<T: Window>(
+unsafe extern "system" fn wndproc<EH: EventHandler>(
     hwnd: HWND,
     msg: u32,
     wparam: WPARAM,
@@ -81,18 +97,11 @@ extern "system" fn wndproc<T: Window>(
         }
 
         if let Some(mut ptr) =
-            std::ptr::NonNull::<T>::new(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut T)
+            std::ptr::NonNull::<EH>::new(GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut EH)
         {
             match msg {
                 WM_PAINT => {
                     ptr.as_mut().on_paint();
-                    return LRESULT(0);
-                }
-                WM_SIZE => {
-                    ptr.as_mut().on_size((
-                        (lparam.0 & 0xFFFF) as u32,
-                        ((lparam.0 >> 16) & 0xFFFF) as u32,
-                    ));
                     return LRESULT(0);
                 }
                 _ => {}
