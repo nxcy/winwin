@@ -18,7 +18,7 @@ pub trait EventHandler {
 }
 
 impl<EH: EventHandler> Window<EH> {
-    pub fn new(size: (u32, u32), name: impl Param<PCWSTR>) -> Result<Self> {
+    pub fn new(size: (u32, u32)) -> Result<Self> {
         unsafe {
             RegisterClassExW(&WNDCLASSEXW {
                 cbSize: size_of::<WNDCLASSEXW>() as u32,
@@ -41,7 +41,7 @@ impl<EH: EventHandler> Window<EH> {
             let hwnd = CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
                 w!("winwin-rs-class-name"),
-                name,
+                w!("Winwin Window"),
                 WS_OVERLAPPEDWINDOW,
                 CW_USEDEFAULT,
                 CW_USEDEFAULT,
